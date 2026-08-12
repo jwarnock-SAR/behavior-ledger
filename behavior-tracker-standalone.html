@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Behavior Ledger</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  :root{
+    --ink:#1e293b; --paper:#f8fafc; --line:#e2e8f0; --muted:#64748b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--paper);color:var(--ink);}
+  .header{background:#0f172a;color:#fff;padding:18px 20px 14px;}
+  .header h1{margin:0;font-size:22px;font-family:Georgia,"Times New Roman",serif;letter-spacing:-0.01em;}
+  .header .sub{color:#94a3b8;font-size:13px;margin-top:2px;font-family:ui-monospace,Menlo,monospace;}
+  .sync-row{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;font-size:13px;}
+  .sync-row button{background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:999px;font-size:13px;cursor:pointer;}
+  .sync-row button:hover{background:#475569;}
+  .sync-status{color:#94a3b8;font-family:ui-monospace,Menlo,monospace;font-size:12px;}
+  .class-row{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+  .class-pill{background:#334155;color:#e2e8f0;border:none;padding:7px 14px;border-radius:999px;font-size:14px;cursor:pointer;font-weight:500;}
+  .class-pill.active{background:#fff;color:#0f172a;}
+  .tabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;}
+  .tab-btn{flex:1;padding:12px 0;text-align:center;background:none;border:none;border-bottom:2px solid transparent;font-size:14px;font-weight:500;color:#94a3b8;cursor:pointer;}
+  .tab-btn.active{color:#0f172a;border-bottom-color:#0f172a;}
+  .content{padding:16px;max-width:680px;margin:0 auto;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
+  .student-name{font-weight:600;margin-bottom:8px;}
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{color:#fff;border:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:transform .15s;}
+  .chip:hover{opacity:.9;}
+  .chip.flash{transform:scale(1.1);box-shadow:0 0 0 3px rgba(15,23,42,0.25);}
+  .empty{color:var(--muted);text-align:center;margin-top:24px;font-size:14px;}
+  .row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  input[type=text], textarea, select{border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;}
+  input[type=text]{flex:1;min-width:120px;}
+  button.primary{background:#0f172a;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer;}
+  button.primary:hover{background:#1e293b;}
+  button.ghost{background:#e2e8f0;color:#334155;border:none;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;}
+  button.danger-link{background:none;border:none;color:#dc2626;font-size:12px;cursor:pointer;padding:0;}
+  h2.section-title{font-family:Georgia,serif;font-size:17px;margin:0 0 10px;}
+  .list-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:14px;}
+  .list-row input[type=text]{border:none;background:transparent;padding:0;font-size:14px;flex:1;}
+  .list-row input[type=text]:focus{outline:none;text-decoration:underline;}
+  .swatch{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:12px;overflow:hidden;}
+  th,td{padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;}
+  th{color:var(--muted);font-weight:600;white-space:nowrap;}
+  td:first-child, th:first-child{text-align:left;font-weight:500;}
+  .filter-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .filter-pills{display:flex;gap:6px;}
+  .filter-pill{background:#e2e8f0;color:#475569;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;}
+  .filter-pill.active{background:#0f172a;color:#fff;}
+  .export-btn{background:#059669;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:50;}
+  .setup-banner{background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:10px 14px;border-radius:8px;font-size:13px;margin:12px 16px 0;}
+  .file-label{font-size:12px;background:#e2e8f0;color:#334155;padding:6px 10px;border-radius:8px;cursor:pointer;}
+  .file-label input{display:none;}
+  a.hidden-link{display:none;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Behavior Ledger</h1>
+  <div class="sub">tap a card to log it</div>
+  <div class="sync-row">
+    <button id="signInBtn">Sign in with Microsoft</button>
+    <button id="syncBtn" style="display:none;">Sync now</button>
+    <span class="sync-status" id="syncStatus">Not signed in — working locally only</span>
+  </div>
+  <div class="class-row" id="classRow"></div>
+</div>
+
+<div id="setupBanner" class="setup-banner" style="display:none;"></div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="log">Log</button>
+  <button class="tab-btn" data-tab="tally">Tally</button>
+  <button class="tab-btn" data-tab="manage">Manage</button>
+</div>
+
+<div class="content" id="content"></div>
+<a id="downloadLink" class="hidden-link"></a>
+
+<script>
+/* ---------- CONFIG: paste your Azure app's Client ID below ---------- */
+const CLIENT_ID = "PASTE-YOUR-CLIENT-ID-HERE";
+/* ---------------------------------------------------------------------- */
+
+const GRAPH_FILE_URL = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/behavior-tracker-data.json:/content";
+const SCOPES = ["Files.ReadWrite.AppFolder", "User.Read"];
+
+const DEFAULT_CLASSES = ["World History", "Algebra 2"];
+const DEFAULT_CARD_TYPES = [
+  { id: "tardy", label: "Tardy", color: "red" },
+  { id: "early", label: "Work in early (sports/trip)", color: "blue" },
+  { id: "above", label: "Above & beyond", color: "emerald" },
+  { id: "missing", label: "Missing/incomplete work", color: "amber" },
+  { id: "participation", label: "Strong participation", color: "violet" },
+  { id: "pass", label: "Used a pass", color: "orange" },
+  { id: "late", label: "Late work accepted", color: "stone" },
+  { id: "redirect", label: "Redirect needed", color: "zinc" },
+];
+const COLOR_HEX = {
+  red:"#dc2626",orange:"#ea580c",amber:"#d97706",yellow:"#ca8a04",lime:"#65a30d",
+  emerald:"#059669",teal:"#0d9488",cyan:"#0891b2",blue:"#2563eb",indigo:"#4f46e5",
+  violet:"#7c3aed",fuchsia:"#a21caf",pink:"#db2777",stone:"#57534e",zinc:"#52525b",black:"#111827"
+};
+const COLOR_CHOICES = Object.keys(COLOR_HEX);
+
+function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+let state = {
+  classes: DEFAULT_CLASSES.slice(),
+  roster: {},
+  cardTypes: DEFAULT_CARD_TYPES.slice(),
+  entries: [],
+  activeClass: DEFAULT_CLASSES[0],
+  tab: "log",
+  rangeFilter: "all",
+  bulkOpen: false,
+};
+
+let msalInstance = null;
+let account = null;
+let lastSynced = null;
+let syncTimer = null;
+
+/* ---------------- Local persistence ---------------- */
+function loadLocal(){
+  try {
+    const cfg = JSON.parse(localStorage.getItem("bt-config") || "null");
+    const entries = JSON.parse(localStorage.getItem("bt-entries") || "[]");
+    if (cfg) {
+      state.classes = cfg.classes && cfg.classes.length ? cfg.classes : DEFAULT_CLASSES.slice();
+      state.roster = cfg.roster || {};
+      state.cardTypes = cfg.cardTypes || DEFAULT_CARD_TYPES.slice();
+      state.activeClass = state.classes[0];
+    }
+    state.entries = entries;
+  } catch (e) { /* ignore */ }
+}
+function saveLocal(){
+  localStorage.setItem("bt-config", JSON.stringify({classes:state.classes, roster:state.roster, cardTypes:state.cardTypes}));
+  localStorage.setItem("bt-entries", JSON.stringify(state.entries));
+}
+
+/* ---------------- Cloud sync (OneDrive via Microsoft Graph) ---------------- */
+function setupBanner(){
+  if (CLIENT_ID === "PASTE-YOUR-CLIENT-ID-HERE") {
+    const el = document.getElementById("setupBanner");
+    el.style.display = "block";
+    el.textContent = "Setup needed: open this file and replace CLIENT_ID near the top with your own Azure app Client ID before sign-in will work. See the setup guide provided with this app.";
+  }
+}
+
+function initMsal(){
+  if (CLIENT_ID === "PASTE-YOUR-CLIENT-ID-HERE") return;
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: "https://login.microsoftonline.com/common",
+      redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "localStorage" }
+  });
+  const existing = msalInstance.getAllAccounts();
+  if (existing.length > 0) {
+    account = existing[0];
+    updateSyncUI();
+    pullFromCloud(true);
+  }
+}
+
+async function signIn(){
+  if (!msalInstance) { alert("Add your Client ID at the top of this file first (see setup guide)."); return; }
+  try {
+    const res = await msalInstance.loginPopup({ scopes: SCOPES });
+    account = res.account;
+    updateSyncUI();
+    await pullFromCloud(true);
+  } catch (e) {
+    console.error(e);
+    setSyncStatus("Sign-in failed: " + (e.errorMessage || e.message));
+  }
+}
+
+async function getToken(){
+  if (!account) return null;
+  try {
+    const res = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
+    return res.accessToken;
+  } catch (e) {
+    const res = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+    return res.accessToken;
+  }
+}
+
+async function pullFromCloud(silent){
+  if (!account) return;
+  setSyncStatus("Syncing…");
+  try {
+    const token = await getToken();
+    const res = await fetch(GRAPH_FILE_URL, { headers: { Authorization: "Bearer " + token }});
+    if (res.status === 404) {
+      setSyncStatus("Signed in — no cloud file yet, will create on first save");
+      await pushToCloud();
+      return;
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    state.classes = data.classes && data.classes.length ? data.classes : state.classes;
+    state.roster = data.roster || state.roster;
+    state.cardTypes = data.cardTypes || state.cardTypes;
+    state.entries = data.entries || state.entries;
+    if (!state.classes.includes(state.activeClass)) state.activeClass = state.classes[0];
+    saveLocal();
+    lastSynced = new Date();
+    setSyncStatus("Synced " + lastSynced.toLocaleTimeString());
+    render();
+  } catch (e) {
+    console.error(e);
+    setSyncStatus(silent ? "Working locally (cloud sync failed)" : "Sync failed — check connection");
+  }
+}
+
+async function pushToCloud(){
+  if (!account) { saveLocal(); return; }
+  try {
+    const token = await getToken();
+    const body = JSON.stringify({classes:state.classes, roster:state.roster, cardTypes:state.cardTypes, entries:state.entries});
+    const res = await fetch(GRAPH_FILE_URL, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    lastSynced = new Date();
+    setSyncStatus("Synced " + lastSynced.toLocaleTimeString());
+  } catch (e) {
+    console.error(e);
+    setSyncStatus("Save failed — will retry on next change");
+  }
+}
+
+function queueCloudSave(){
+  saveLocal();
+  if (!account) return;
+  clearTimeout(syncTimer);
+  setSyncStatus("Saving…");
+  syncTimer = setTimeout(pushToCloud, 1200);
+}
+
+function updateSyncUI(){
+  document.getElementById("signInBtn").textContent = account ? ("Signed in: " + (account.username || account.name)) : "Sign in with Microsoft";
+  document.getElementById("syncBtn").style.display = account ? "inline-block" : "none";
+}
+function setSyncStatus(text){
+  document.getElementById("syncStatus").textContent = text;
+}
+
+/* ---------------- Data actions ---------------- */
+function persist(){ queueCloudSave(); render(); }
+
+function addClass(name){
+  name = name.trim();
+  if (!name || state.classes.includes(name)) return;
+  state.classes.push(name);
+  state.activeClass = name;
+  persist();
+}
+function renameClass(oldName, newName){
+  newName = newName.trim();
+  if (!newName || newName === oldName || state.classes.includes(newName)) { render(); return; }
+  state.classes = state.classes.map(c => c === oldName ? newName : c);
+  state.roster[newName] = state.roster[oldName] || [];
+  delete state.roster[oldName];
+  if (state.activeClass === oldName) state.activeClass = newName;
+  persist();
+}
+function removeClass(name){
+  if (state.classes.length <= 1) { setSyncStatus("Keep at least one class"); return; }
+  state.classes = state.classes.filter(c => c !== name);
+  delete state.roster[name];
+  if (state.activeClass === name) state.activeClass = state.classes[0];
+  persist();
+}
+
+function addStudent(name){
+  name = name.trim();
+  if (!name) return;
+  if (!state.roster[state.activeClass]) state.roster[state.activeClass] = [];
+  state.roster[state.activeClass].push({id: uid(), name});
+  persist();
+}
+function removeStudent(id){
+  state.roster[state.activeClass] = (state.roster[state.activeClass]||[]).filter(s => s.id !== id);
+  persist();
+}
+function parseNames(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const names = [];
+  for (const line of lines){
+    const parts = line.split(",").map(p=>p.trim()).filter(Boolean);
+    if (parts.length === 2 && !line.toLowerCase().startsWith("name")){
+      names.push(parts[1] + " " + parts[0]);
+    } else {
+      for (const p of parts){
+        const lp = p.toLowerCase();
+        if (p && lp!=="name" && lp!=="student" && lp!=="students") names.push(p);
+      }
+    }
+  }
+  return names;
+}
+function addBulkStudents(text){
+  const names = parseNames(text);
+  if (names.length === 0) return;
+  if (!state.roster[state.activeClass]) state.roster[state.activeClass] = [];
+  const existing = new Set(state.roster[state.activeClass].map(s=>s.name.toLowerCase()));
+  let added = 0;
+  for (const name of names){
+    if (!existing.has(name.toLowerCase())){
+      existing.add(name.toLowerCase());
+      state.roster[state.activeClass].push({id: uid(), name});
+      added++;
+    }
+  }
+  state.bulkOpen = false;
+  persist();
+  setSyncStatus("Added " + added + " student" + (added===1?"":"s"));
+}
+
+function addCardType(label, color){
+  label = label.trim();
+  if (!label) return;
+  state.cardTypes.push({id: uid(), label, color});
+  persist();
+}
+function removeCardType(id){
+  state.cardTypes = state.cardTypes.filter(c => c.id !== id);
+  persist();
+}
+
+function logCard(studentId, cardTypeId, btnEl){
+  state.entries.push({id: uid(), classId: state.activeClass, studentId, cardTypeId, ts: Date.now()});
+  persist();
+  if (btnEl) {
+    btnEl.classList.add("flash");
+    setTimeout(()=>btnEl.classList.remove("flash"), 400);
+  }
+}
+function undoLast(){
+  if (state.entries.length === 0) return;
+  state.entries.pop();
+  persist();
+}
+
+function exportCSV(){
+  const rows = tallyRows();
+  const header = ["Student", ...state.cardTypes.map(c=>c.label), "Total"];
+  const lines = [header, ...rows.map(r => [r.name, ...state.cardTypes.map(c=>r.counts[c.id]||0), r.total])];
+  const csv = lines.map(r => r.map(cell => '"' + String(cell).replace(/"/g,'""') + '"').join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.getElementById("downloadLink");
+  a.href = url;
+  a.download = state.activeClass.replace(/\s+/g,"_") + "_tally.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportBackup(){
+  const data = JSON.stringify({classes:state.classes, roster:state.roster, cardTypes:state.cardTypes, entries:state.entries}, null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.getElementById("downloadLink");
+  a.href = url;
+  a.download = "behavior-ledger-backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importBackup(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      state.classes = data.classes && data.classes.length ? data.classes : state.classes;
+      state.roster = data.roster || state.roster;
+      state.cardTypes = data.cardTypes || state.cardTypes;
+      state.entries = data.entries || state.entries;
+      if (!state.classes.includes(state.activeClass)) state.activeClass = state.classes[0];
+      persist();
+      setSyncStatus("Backup imported");
+    } catch (err) {
+      alert("Could not read that file — is it a Behavior Ledger backup JSON?");
+    }
+  };
+  reader.readAsText(file);
+}
+
+const RANGE_MS = { all: Infinity, "7": 7*864e5, "30": 30*864e5, "90": 90*864e5 };
+function tallyRows(){
+  const cutoff = RANGE_MS[state.rangeFilter];
+  const now = Date.now();
+  const students = state.roster[state.activeClass] || [];
+  const filtered = state.entries.filter(e => e.classId === state.activeClass && (cutoff===Infinity || now-e.ts<=cutoff));
+  return students.map(s => {
+    const counts = {};
+    state.cardTypes.forEach(c => counts[c.id]=0);
+    let total = 0;
+    filtered.forEach(e => { if (e.studentId===s.id){ counts[e.cardTypeId]=(counts[e.cardTypeId]||0)+1; total++; } });
+    return {name:s.name, counts, total};
+  });
+}
+
+/* ---------------- Rendering ---------------- */
+function render(){
+  document.getElementById("classRow").innerHTML = state.classes.map(c =>
+    `<button class="class-pill ${c===state.activeClass?"active":""}" data-class="${esc(c)}">${esc(c)}</button>`
+  ).join("");
+  document.querySelectorAll(".class-pill").forEach(btn => {
+    btn.onclick = () => { state.activeClass = btn.dataset.class; render(); };
+  });
+
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === state.tab);
+    btn.onclick = () => { state.tab = btn.dataset.tab; render(); };
+  });
+
+  const content = document.getElementById("content");
+  if (state.tab === "log") content.innerHTML = renderLog();
+  else if (state.tab === "tally") content.innerHTML = renderTally();
+  else content.innerHTML = renderManage();
+
+  attachContentHandlers();
+}
+
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function renderLog(){
+  const students = state.roster[state.activeClass] || [];
+  if (students.length === 0) return `<p class="empty">No students in ${esc(state.activeClass)} yet. Add your roster in the Manage tab.</p>`;
+  let html = students.map(s => `
+    <div class="card">
+      <div class="student-name">${esc(s.name)}</div>
+      <div class="chip-row">
+        ${state.cardTypes.map(c => `<button class="chip" style="background:${COLOR_HEX[c.color]||"#334155"}" data-student="${s.id}" data-card="${c.id}" title="${esc(c.label)}">${esc(c.label)}</button>`).join("")}
+      </div>
+    </div>`).join("");
+  if (state.entries.length > 0) html += `<button class="danger-link" id="undoBtn" style="margin-top:6px;">Undo last entry</button>`;
+  return html;
+}
+
+function renderTally(){
+  const rows = tallyRows();
+  const filters = [["all","All time"],["7","7 days"],["30","30 days"],["90","90 days"]];
+  let html = `<div class="filter-row">
+    <div class="filter-pills">${filters.map(([k,l])=>`<button class="filter-pill ${state.rangeFilter===k?"active":""}" data-range="${k}">${l}</button>`).join("")}</div>
+    <button class="export-btn" id="exportCsvBtn">Export CSV</button>
+  </div>`;
+  if (rows.length === 0){
+    html += `<p class="empty">Add students to ${esc(state.activeClass)} to see tallies.</p>`;
+    return html;
+  }
+  html += `<table><thead><tr><th>Student</th>${state.cardTypes.map(c=>`<th><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</th>`).join("")}<th>Total</th></tr></thead><tbody>`;
+  rows.forEach(r => {
+    html += `<tr><td>${esc(r.name)}</td>${state.cardTypes.map(c=>`<td>${r.counts[c.id]||0}</td>`).join("")}<td><strong>${r.total}</strong></td></tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderManage(){
+  const students = state.roster[state.activeClass] || [];
+  return `
+  <h2 class="section-title">Classes / sections</h2>
+  <div class="row">
+    <input type="text" id="newClassInput" placeholder='e.g. "World History (Period 2)"' />
+    <button class="primary" id="addClassBtn">Add class</button>
+  </div>
+  ${state.classes.map(c => `
+    <div class="list-row">
+      <input type="text" value="${esc(c)}" data-oldname="${esc(c)}" class="renameClassInput" />
+      <button class="danger-link" data-remove-class="${esc(c)}">Remove</button>
+    </div>`).join("")}
+  <p style="font-size:12px;color:var(--muted);margin-top:4px;">Click a class name to rename it. Each class keeps its own roster and tallies.</p>
+
+  <h2 class="section-title" style="margin-top:22px;">Roster — ${esc(state.activeClass)}</h2>
+  <div class="row">
+    <input type="text" id="newStudentInput" placeholder="Student name" />
+    <button class="primary" id="addStudentBtn">Add</button>
+  </div>
+  <div class="row" style="align-items:center;">
+    <button class="ghost" id="toggleBulkBtn">${state.bulkOpen ? "Hide bulk import" : "Bulk import roster"}</button>
+    <label class="file-label">Upload CSV / TXT<input type="file" id="fileUploadInput" accept=".csv,.txt" /></label>
+  </div>
+  ${state.bulkOpen ? `
+    <textarea id="bulkTextarea" rows="5" style="width:100%;" placeholder="Paste names, one per line"></textarea>
+    <button class="primary" id="importBulkBtn" style="margin-top:6px;">Import list</button>
+    <p style="font-size:12px;color:var(--muted);">Duplicate names already in this class's roster are skipped.</p>
+  ` : ""}
+  <div style="margin-top:10px;">
+    ${students.map(s => `<div class="list-row"><span>${esc(s.name)}</span><button class="danger-link" data-remove-student="${s.id}">Remove</button></div>`).join("")}
+  </div>
+
+  <h2 class="section-title" style="margin-top:22px;">Card types</h2>
+  <div class="row">
+    <input type="text" id="newCardLabelInput" placeholder="New card label" />
+    <select id="newCardColorSelect">${COLOR_CHOICES.map(c=>`<option value="${c}">${c}</option>`).join("")}</select>
+    <button class="primary" id="addCardTypeBtn">Add</button>
+  </div>
+  ${state.cardTypes.map(c => `
+    <div class="list-row">
+      <span><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</span>
+      <button class="danger-link" data-remove-card="${c.id}">Remove</button>
+    </div>`).join("")}
+
+  <h2 class="section-title" style="margin-top:22px;">Backup file</h2>
+  <div class="row">
+    <button class="ghost" id="exportBackupBtn">Download backup (.json)</button>
+    <label class="file-label">Restore from backup<input type="file" id="restoreInput" accept=".json" /></label>
+  </div>
+  <p style="font-size:12px;color:var(--muted);">Useful as an extra safety net alongside OneDrive sync.</p>
+  `;
+}
+
+function attachContentHandlers(){
+  document.querySelectorAll(".chip").forEach(btn => {
+    btn.onclick = () => logCard(btn.dataset.student, btn.dataset.card, btn);
+  });
+  const undoBtn = document.getElementById("undoBtn");
+  if (undoBtn) undoBtn.onclick = undoLast;
+
+  document.querySelectorAll(".filter-pill").forEach(btn => {
+    btn.onclick = () => { state.rangeFilter = btn.dataset.range; render(); };
+  });
+  const exportCsvBtn = document.getElementById("exportCsvBtn");
+  if (exportCsvBtn) exportCsvBtn.onclick = exportCSV;
+
+  const addClassBtn = document.getElementById("addClassBtn");
+  if (addClassBtn) addClassBtn.onclick = () => {
+    const input = document.getElementById("newClassInput");
+    addClass(input.value); input.value = "";
+  };
+  document.querySelectorAll(".renameClassInput").forEach(inp => {
+    inp.onblur = () => renameClass(inp.dataset.oldname, inp.value);
+    inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
+  });
+  document.querySelectorAll("[data-remove-class]").forEach(btn => {
+    btn.onclick = () => removeClass(btn.dataset.removeClass);
+  });
+
+  const addStudentBtn = document.getElementById("addStudentBtn");
+  if (addStudentBtn) addStudentBtn.onclick = () => {
+    const input = document.getElementById("newStudentInput");
+    addStudent(input.value); input.value = "";
+  };
+  const newStudentInput = document.getElementById("newStudentInput");
+  if (newStudentInput) newStudentInput.onkeydown = (e) => { if (e.key==="Enter") addStudentBtn.click(); };
+
+  document.querySelectorAll("[data-remove-student]").forEach(btn => {
+    btn.onclick = () => removeStudent(btn.dataset.removeStudent);
+  });
+
+  const toggleBulkBtn = document.getElementById("toggleBulkBtn");
+  if (toggleBulkBtn) toggleBulkBtn.onclick = () => { state.bulkOpen = !state.bulkOpen; render(); };
+  const importBulkBtn = document.getElementById("importBulkBtn");
+  if (importBulkBtn) importBulkBtn.onclick = () => {
+    addBulkStudents(document.getElementById("bulkTextarea").value);
+  };
+  const fileUploadInput = document.getElementById("fileUploadInput");
+  if (fileUploadInput) fileUploadInput.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => addBulkStudents(String(ev.target.result||""));
+    reader.readAsText(file);
+  };
+
+  const addCardTypeBtn = document.getElementById("addCardTypeBtn");
+  if (addCardTypeBtn) addCardTypeBtn.onclick = () => {
+    const label = document.getElementById("newCardLabelInput").value;
+    const color = document.getElementById("newCardColorSelect").value;
+    addCardType(label, color);
+    document.getElementById("newCardLabelInput").value = "";
+  };
+  document.querySelectorAll("[data-remove-card]").forEach(btn => {
+    btn.onclick = () => removeCardType(btn.dataset.removeCard);
+  });
+
+  const exportBackupBtn = document.getElementById("exportBackupBtn");
+  if (exportBackupBtn) exportBackupBtn.onclick = exportBackup;
+  const restoreInput = document.getElementById("restoreInput");
+  if (restoreInput) restoreInput.onchange = (e) => {
+    const file = e.target.files[0]; if (file) importBackup(file);
+  };
+}
+
+/* ---------------- Init ---------------- */
+document.getElementById("signInBtn").onclick = signIn;
+document.getElementById("syncBtn").onclick = () => pullFromCloud(false);
+
+loadLocal();
+setupBanner();
+initMsal();
+render();
+</script>
+</body>
+</html>
