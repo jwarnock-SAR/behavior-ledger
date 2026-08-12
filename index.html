@@ -1,10 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Behavior Ledger</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <style>
   :root{
     --ink:#1e293b; --paper:#f8fafc; --line:#e2e8f0; --muted:#64748b;
@@ -158,6 +159,12 @@ function setupBanner(){
 
 function initMsal(){
   if (CLIENT_ID === "PASTE-YOUR-CLIENT-ID-HERE") return;
+  if (typeof msal === "undefined") {
+    const el = document.getElementById("setupBanner");
+    el.style.display = "block";
+    el.textContent = "The Microsoft sign-in library failed to load from the CDN (check your network connection or try a different network), so sign-in is unavailable right now. Everything else still works offline.";
+    return;
+  }
   msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: CLIENT_ID,
@@ -175,7 +182,12 @@ function initMsal(){
 }
 
 async function signIn(){
-  if (!msalInstance) { alert("Add your Client ID at the top of this file first (see setup guide)."); return; }
+  if (!msalInstance) {
+    alert(typeof msal === "undefined"
+      ? "The Microsoft sign-in library couldn't load (likely a network issue) — try a different network or reload the page."
+      : "Add your Client ID at the top of this file first (see setup guide).");
+    return;
+  }
   try {
     const res = await msalInstance.loginPopup({ scopes: SCOPES });
     account = res.account;
