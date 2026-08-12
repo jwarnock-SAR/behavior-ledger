@@ -121,6 +121,7 @@ let state = {
   activeClass: DEFAULT_CLASSES[0],
   tab: "log",
   rangeFilter: "all",
+  showHistory: false,
   bulkOpen: false,
 };
 
@@ -414,11 +415,14 @@ function importBackup(file){
 }
 
 const RANGE_MS = { all: Infinity, "7": 7*864e5, "30": 30*864e5, "90": 90*864e5 };
-function tallyRows(){
+function filteredEntries(){
   const cutoff = RANGE_MS[state.rangeFilter];
   const now = Date.now();
+  return state.entries.filter(e => e.classId === state.activeClass && (cutoff===Infinity || now-e.ts<=cutoff));
+}
+function tallyRows(){
   const students = state.roster[state.activeClass] || [];
-  const filtered = state.entries.filter(e => e.classId === state.activeClass && (cutoff===Infinity || now-e.ts<=cutoff));
+  const filtered = filteredEntries();
   return students.map(s => {
     const counts = {};
     state.cardTypes.forEach(c => counts[c.id]=0);
@@ -426,6 +430,32 @@ function tallyRows(){
     filtered.forEach(e => { if (e.studentId===s.id){ counts[e.cardTypeId]=(counts[e.cardTypeId]||0)+1; total++; } });
     return {name:s.name, counts, total};
   });
+}
+function removeEntry(entryId){
+  state.entries = state.entries.filter(e => e.id !== entryId);
+  persist();
+  setSyncStatus("Entry removed");
+}
+function formatTs(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}) + " " + d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+}
+function exportEntryLogCSV(){
+  const rows = [...filteredEntries()].sort((a,b)=>a.ts-b.ts).map(e => {
+    const student = (state.roster[state.activeClass]||[]).find(s=>s.id===e.studentId);
+    const card = state.cardTypes.find(c=>c.id===e.cardTypeId);
+    const d = new Date(e.ts);
+    return [d.toLocaleDateString(), d.toLocaleTimeString(), student?student.name:"(removed student)", card?card.label:"(removed card type)"];
+  });
+  const lines = [["Date","Time","Student","Card"], ...rows];
+  const csv = lines.map(r => r.map(cell => '"' + String(cell).replace(/"/g,'""') + '"').join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.getElementById("downloadLink");
+  a.href = url;
+  a.download = state.activeClass.replace(/\s+/g,"_") + "_entry_log.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ---------------- Rendering ---------------- */
@@ -475,13 +505,38 @@ function renderTally(){
   </div>`;
   if (rows.length === 0){
     html += `<p class="empty">Add students to ${esc(state.activeClass)} to see tallies.</p>`;
-    return html;
+  } else {
+    html += `<table><thead><tr><th>Student</th>${state.cardTypes.map(c=>`<th><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</th>`).join("")}<th>Total</th></tr></thead><tbody>`;
+    rows.forEach(r => {
+      html += `<tr><td>${esc(r.name)}</td>${state.cardTypes.map(c=>`<td>${r.counts[c.id]||0}</td>`).join("")}<td><strong>${r.total}</strong></td></tr>`;
+    });
+    html += `</tbody></table>`;
   }
-  html += `<table><thead><tr><th>Student</th>${state.cardTypes.map(c=>`<th><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</th>`).join("")}<th>Total</th></tr></thead><tbody>`;
-  rows.forEach(r => {
-    html += `<tr><td>${esc(r.name)}</td>${state.cardTypes.map(c=>`<td>${r.counts[c.id]||0}</td>`).join("")}<td><strong>${r.total}</strong></td></tr>`;
-  });
-  html += `</tbody></table>`;
+
+  html += `<button class="danger-link" id="toggleHistoryBtn" style="margin-top:10px;">${state.showHistory ? "Hide entry log" : "Show entry log (with timestamps)"}</button>`;
+
+  if (state.showHistory){
+    const entries = [...filteredEntries()].sort((a,b)=>b.ts-a.ts);
+    if (entries.length === 0){
+      html += `<p class="empty" style="margin-top:8px;">No entries logged for this range yet.</p>`;
+    } else {
+      html += `<div style="text-align:right;margin-top:8px;"><button class="danger-link" id="exportLogBtn" style="color:#047857;">Export this log as CSV</button></div>`;
+      html += `<div style="max-height:320px;overflow-y:auto;margin-top:6px;">`;
+      entries.forEach(e => {
+        const student = (state.roster[state.activeClass]||[]).find(s=>s.id===e.studentId);
+        const card = state.cardTypes.find(c=>c.id===e.cardTypeId);
+        if (!student || !card) return;
+        html += `<div class="list-row">
+          <span><span class="swatch" style="background:${COLOR_HEX[card.color]}"></span>${esc(student.name)} — ${esc(card.label)}</span>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;">${formatTs(e.ts)}</span>
+            <button class="danger-link" data-remove-entry="${e.id}">Remove</button>
+          </span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
   return html;
 }
 
@@ -551,6 +606,14 @@ function attachContentHandlers(){
   });
   const exportCsvBtn = document.getElementById("exportCsvBtn");
   if (exportCsvBtn) exportCsvBtn.onclick = exportCSV;
+
+  const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
+  if (toggleHistoryBtn) toggleHistoryBtn.onclick = () => { state.showHistory = !state.showHistory; render(); };
+  const exportLogBtn = document.getElementById("exportLogBtn");
+  if (exportLogBtn) exportLogBtn.onclick = exportEntryLogCSV;
+  document.querySelectorAll("[data-remove-entry]").forEach(btn => {
+    btn.onclick = () => removeEntry(btn.dataset.removeEntry);
+  });
 
   const addClassBtn = document.getElementById("addClassBtn");
   if (addClassBtn) addClassBtn.onclick = () => {
