@@ -87,7 +87,7 @@
 
 <script>
 /* ---------- CONFIG: paste your Azure app's Client ID below ---------- */
-const CLIENT_ID = "b26821c0-b252-49c1-b0bb-5c989b57ec2d";
+const CLIENT_ID = "PASTE-YOUR-CLIENT-ID-HERE";
 /* ---------------------------------------------------------------------- */
 
 const GRAPH_FILE_URL = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/behavior-tracker-data.json:/content";
@@ -311,6 +311,20 @@ function addStudent(name){
 function removeStudent(id){
   state.roster[state.activeClass] = (state.roster[state.activeClass]||[]).filter(s => s.id !== id);
   persist();
+}
+function clearStudentEntries(studentId, studentName){
+  const ok = confirm(`Clear all logged cards for ${studentName} in ${state.activeClass}? This cannot be undone.`);
+  if (!ok) return;
+  state.entries = state.entries.filter(e => !(e.classId === state.activeClass && e.studentId === studentId));
+  persist();
+  setSyncStatus(`Cleared cards for ${studentName}`);
+}
+function clearClassEntries(){
+  const ok = confirm(`Clear ALL logged cards for every student in ${state.activeClass}? This is meant for starting a new quarter and cannot be undone.`);
+  if (!ok) return;
+  state.entries = state.entries.filter(e => e.classId !== state.activeClass);
+  persist();
+  setSyncStatus(`Cleared all cards for ${state.activeClass}`);
 }
 function parseNames(text){
   const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -570,7 +584,13 @@ function renderManage(){
     <p style="font-size:12px;color:var(--muted);">Duplicate names already in this class's roster are skipped.</p>
   ` : ""}
   <div style="margin-top:10px;">
-    ${students.map(s => `<div class="list-row"><span>${esc(s.name)}</span><button class="danger-link" data-remove-student="${s.id}">Remove</button></div>`).join("")}
+    ${students.map(s => `<div class="list-row">
+      <span>${esc(s.name)}</span>
+      <span style="display:flex;gap:10px;">
+        <button class="danger-link" style="color:#b45309;" data-clear-student="${s.id}" data-student-name="${esc(s.name)}">Clear cards</button>
+        <button class="danger-link" data-remove-student="${s.id}">Remove</button>
+      </span>
+    </div>`).join("")}
   </div>
 
   <h2 class="section-title" style="margin-top:22px;">Card types</h2>
@@ -591,6 +611,12 @@ function renderManage(){
     <label class="file-label">Restore from backup<input type="file" id="restoreInput" accept=".json" /></label>
   </div>
   <p style="font-size:12px;color:var(--muted);">Useful as an extra safety net alongside OneDrive sync.</p>
+
+  <h2 class="section-title" style="margin-top:22px;color:#b91c1c;">Danger zone — new quarter reset</h2>
+  <div class="row">
+    <button class="ghost" id="clearClassBtn" style="background:#fee2e2;color:#b91c1c;">Clear all cards for ${esc(state.activeClass)}</button>
+  </div>
+  <p style="font-size:12px;color:var(--muted);">Removes every logged card for every student in this class only — rosters, other classes, and card types are untouched. Consider downloading a backup first if you want a record of the quarter.</p>
   `;
 }
 
@@ -639,6 +665,9 @@ function attachContentHandlers(){
   document.querySelectorAll("[data-remove-student]").forEach(btn => {
     btn.onclick = () => removeStudent(btn.dataset.removeStudent);
   });
+  document.querySelectorAll("[data-clear-student]").forEach(btn => {
+    btn.onclick = () => clearStudentEntries(btn.dataset.clearStudent, btn.dataset.studentName);
+  });
 
   const toggleBulkBtn = document.getElementById("toggleBulkBtn");
   if (toggleBulkBtn) toggleBulkBtn.onclick = () => { state.bulkOpen = !state.bulkOpen; render(); };
@@ -671,6 +700,8 @@ function attachContentHandlers(){
   if (restoreInput) restoreInput.onchange = (e) => {
     const file = e.target.files[0]; if (file) importBackup(file);
   };
+  const clearClassBtn = document.getElementById("clearClassBtn");
+  if (clearClassBtn) clearClassBtn.onclick = clearClassEntries;
 }
 
 /* ---------------- Init ---------------- */
