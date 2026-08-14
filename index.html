@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,7 +47,9 @@
   .list-row input[type=text]{border:none;background:transparent;padding:0;font-size:14px;flex:1;}
   .list-row input[type=text]:focus{outline:none;text-decoration:underline;}
   .swatch{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
-  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:12px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;min-width:640px;}
+  .sticky-col{position:sticky;left:0;background:#fff;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,0.04);}
+  thead .sticky-col{z-index:2;}
   th,td{padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;}
   th{color:var(--muted);font-weight:600;white-space:nowrap;}
   td:first-child, th:first-child{text-align:left;font-weight:500;}
@@ -523,11 +524,11 @@ function renderTally(){
   if (rows.length === 0){
     html += `<p class="empty">Add students to ${esc(state.activeClass)} to see tallies.</p>`;
   } else {
-    html += `<table><thead><tr><th>Student</th>${state.cardTypes.map(c=>`<th><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</th>`).join("")}<th>Total</th></tr></thead><tbody>`;
+    html += `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table><thead><tr><th class="sticky-col">Student</th>${state.cardTypes.map(c=>`<th><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</th>`).join("")}<th>Total</th></tr></thead><tbody>`;
     rows.forEach(r => {
-      html += `<tr><td>${esc(r.name)}</td>${state.cardTypes.map(c=>`<td>${r.counts[c.id]||0}</td>`).join("")}<td><strong>${r.total}</strong></td></tr>`;
+      html += `<tr><td class="sticky-col">${esc(r.name)}</td>${state.cardTypes.map(c=>`<td>${r.counts[c.id]||0}</td>`).join("")}<td><strong>${r.total}</strong></td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   }
 
   html += `<button class="danger-link" id="toggleHistoryBtn" style="margin-top:10px;">${state.showHistory ? "Hide entry log" : "Show entry log (with timestamps)"}</button>`;
