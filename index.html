@@ -5,7 +5,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Behavior Ledger</title>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0f172a" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<script src="msal-browser.min.js"></script>
 <style>
   :root{
     --ink:#1e293b; --paper:#f8fafc; --line:#e2e8f0; --muted:#64748b;
@@ -25,7 +28,7 @@
   .tabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;}
   .tab-btn{flex:1;padding:12px 0;text-align:center;background:none;border:none;border-bottom:2px solid transparent;font-size:14px;font-weight:500;color:#94a3b8;cursor:pointer;}
   .tab-btn.active{color:#0f172a;border-bottom-color:#0f172a;}
-  .content{padding:16px;max-width:680px;margin:0 auto;}
+  .content{padding:16px;width:100%;max-width:680px;margin:0;box-sizing:border-box;}
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
   .student-name{font-weight:600;margin-bottom:8px;}
   .chip-row{display:flex;flex-wrap:wrap;gap:6px;}
@@ -712,6 +715,12 @@ loadLocal();
 setupBanner();
 initMsal();
 render();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("Service worker failed to register:", e));
+  });
+}
 </script>
 </body>
 </html>
