@@ -4,9 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Behavior Ledger</title>
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0f172a" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <script src="msal-browser.min.js"></script>
 <style>
   :root{
@@ -719,12 +716,6 @@ loadLocal();
 setupBanner();
 initMsal();
 render();
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("Service worker failed to register:", e));
-  });
-}
 </script>
 </body>
 </html>

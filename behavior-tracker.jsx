@@ -252,6 +252,18 @@ export default function BehaviorTracker() {
     persistConfig(next, cardTypes);
   }
 
+  function clearStudentEntries(studentId, studentName) {
+    if (!window.confirm(`Clear all logged cards for ${studentName} in ${activeClass}? This cannot be undone.`)) return;
+    persistEntries(entries.filter((e) => !(e.classId === activeClass && e.studentId === studentId)));
+    showToast(`Cleared cards for ${studentName}`);
+  }
+
+  function clearClassEntries() {
+    if (!window.confirm(`Clear ALL logged cards for every student in ${activeClass}? This is meant for starting a new quarter and cannot be undone.`)) return;
+    persistEntries(entries.filter((e) => e.classId !== activeClass));
+    showToast(`Cleared all cards for ${activeClass}`);
+  }
+
   function addCardType() {
     const label = newCardLabel.trim();
     if (!label) return;
@@ -389,7 +401,7 @@ export default function BehaviorTracker() {
         ))}
       </div>
 
-      <div className="p-4 max-w-2xl mx-auto">
+      <div className="p-4 max-w-2xl">
         {tab === "log" && (
           <>
             {students.length === 0 && (
@@ -468,11 +480,16 @@ export default function BehaviorTracker() {
                 Add students to {activeClass} to see tallies.
               </p>
             ) : (
+              {cardTypes.length > 5 && (
+                <p className="text-xs text-slate-400 mb-1">
+                  ↔ Swipe/scroll sideways in the table to see all {cardTypes.length} categories — the Student column stays put.
+                </p>
+              )}
               <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
-                <table className="w-full text-sm font-mono">
+                <table className="text-sm font-mono" style={{ minWidth: "640px", width: "100%" }}>
                   <thead>
                     <tr className="text-left text-slate-500 border-b border-slate-200">
-                      <th className="p-2 font-sans font-medium text-slate-700">Student</th>
+                      <th className="p-2 font-sans font-medium text-slate-700 sticky left-0 bg-white z-10">Student</th>
                       {cardTypes.map((c) => (
                         <th key={c.id} className="p-2 text-center whitespace-nowrap">
                           <span className={`inline-block w-2 h-2 rounded-full ${COLOR_BG[c.color]} mr-1`} />
@@ -485,7 +502,7 @@ export default function BehaviorTracker() {
                   <tbody>
                     {Object.values(tally).map((row, i) => (
                       <tr key={i} className="border-b border-slate-100 last:border-0">
-                        <td className="p-2 font-sans">{row.name}</td>
+                        <td className="p-2 font-sans sticky left-0 bg-white">{row.name}</td>
                         {cardTypes.map((c) => (
                           <td key={c.id} className="p-2 text-center">
                             {row.counts[c.id] || 0}
@@ -668,12 +685,20 @@ export default function BehaviorTracker() {
                     className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-sm"
                   >
                     <span>{s.name}</span>
-                    <button
-                      onClick={() => removeStudent(s.id)}
-                      className="text-red-500 text-xs"
-                    >
-                      Remove
-                    </button>
+                    <span className="flex items-center gap-3">
+                      <button
+                        onClick={() => clearStudentEntries(s.id, s.name)}
+                        className="text-amber-600 text-xs"
+                      >
+                        Clear cards
+                      </button>
+                      <button
+                        onClick={() => removeStudent(s.id)}
+                        className="text-red-500 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -725,6 +750,21 @@ export default function BehaviorTracker() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section>
+              <h2 className="font-serif text-lg mb-2 text-red-700">Danger zone — new quarter reset</h2>
+              <button
+                onClick={clearClassEntries}
+                className="px-3 py-1.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm font-medium"
+              >
+                Clear all cards for {activeClass}
+              </button>
+              <p className="text-xs text-slate-400 mt-1.5">
+                Removes every logged card for every student in this class only — rosters, other
+                classes, and card types are untouched. Consider exporting a backup first if you
+                want a record of the quarter.
+              </p>
             </section>
           </div>
         )}
