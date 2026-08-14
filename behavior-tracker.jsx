@@ -126,6 +126,14 @@ export default function BehaviorTracker() {
     if (activeClass === name) setActiveClass(nextClasses[0]);
   }
 
+  function moveClass(index, dir) {
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= classes.length) return;
+    const nextClasses = [...classes];
+    [nextClasses[index], nextClasses[newIndex]] = [nextClasses[newIndex], nextClasses[index]];
+    persistConfig(roster, cardTypes, nextClasses);
+  }
+
   function renameClass(oldName, newName) {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName || classes.includes(trimmed)) return;
@@ -274,6 +282,14 @@ export default function BehaviorTracker() {
 
   function removeCardType(cardTypeId) {
     const next = cardTypes.filter((c) => c.id !== cardTypeId);
+    persistConfig(roster, next);
+  }
+
+  function moveCardType(index, dir) {
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= cardTypes.length) return;
+    const next = [...cardTypes];
+    [next[index], next[newIndex]] = [next[newIndex], next[index]];
     persistConfig(roster, next);
   }
 
@@ -595,11 +611,27 @@ export default function BehaviorTracker() {
                 </button>
               </div>
               <div className="space-y-1">
-                {classes.map((c) => (
+                {classes.map((c, i) => (
                   <div
                     key={c}
-                    className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-sm"
+                    className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-sm gap-2"
                   >
+                    <span className="flex flex-col shrink-0">
+                      <button
+                        onClick={() => moveClass(i, -1)}
+                        disabled={i === 0}
+                        className="text-slate-500 disabled:opacity-25 leading-none text-[10px] h-3.5"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => moveClass(i, 1)}
+                        disabled={i === classes.length - 1}
+                        className="text-slate-500 disabled:opacity-25 leading-none text-[10px] h-3.5"
+                      >
+                        ▼
+                      </button>
+                    </span>
                     <input
                       defaultValue={c}
                       onBlur={(e) => renameClass(c, e.target.value)}
@@ -732,12 +764,28 @@ export default function BehaviorTracker() {
                 </button>
               </div>
               <div className="space-y-1">
-                {cardTypes.map((c) => (
+                {cardTypes.map((c, i) => (
                   <div
                     key={c.id}
-                    className={`flex items-center justify-between border rounded-md px-2.5 py-1.5 text-sm ${COLOR_BG_SOFT[c.color]}`}
+                    className={`flex items-center justify-between border rounded-md px-2.5 py-1.5 text-sm gap-2 ${COLOR_BG_SOFT[c.color]}`}
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-col shrink-0">
+                      <button
+                        onClick={() => moveCardType(i, -1)}
+                        disabled={i === 0}
+                        className="text-slate-500 disabled:opacity-25 leading-none text-[10px] h-3.5"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => moveCardType(i, 1)}
+                        disabled={i === cardTypes.length - 1}
+                        className="text-slate-500 disabled:opacity-25 leading-none text-[10px] h-3.5"
+                      >
+                        ▼
+                      </button>
+                    </span>
+                    <span className="flex items-center gap-2 flex-1">
                       <span className={`w-3 h-3 rounded-full ${COLOR_BG[c.color]}`} />
                       {c.label}
                     </span>

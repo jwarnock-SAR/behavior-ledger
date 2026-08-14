@@ -40,7 +40,11 @@
   button.ghost{background:#e2e8f0;color:#334155;border:none;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;}
   button.danger-link{background:none;border:none;color:#dc2626;font-size:12px;cursor:pointer;padding:0;}
   h2.section-title{font-family:Georgia,serif;font-size:17px;margin:0 0 10px;}
-  .list-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:14px;}
+  .list-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:14px;gap:8px;}
+  .move-btns{display:flex;flex-direction:column;gap:1px;}
+  .move-btn{background:#e2e8f0;color:#334155;border:none;width:22px;height:16px;font-size:9px;line-height:1;border-radius:3px;cursor:pointer;padding:0;}
+  .move-btn:disabled{opacity:0.25;cursor:default;}
+  .move-btn:not(:disabled):hover{background:#cbd5e1;}
   .list-row input[type=text]{border:none;background:transparent;padding:0;font-size:14px;flex:1;}
   .list-row input[type=text]:focus{outline:none;text-decoration:underline;}
   .swatch{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
@@ -301,6 +305,13 @@ function removeClass(name){
   if (state.activeClass === name) state.activeClass = state.classes[0];
   persist();
 }
+function moveClass(index, dir){
+  const newIndex = index + dir;
+  if (newIndex < 0 || newIndex >= state.classes.length) return;
+  const arr = state.classes;
+  [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+  persist();
+}
 
 function addStudent(name){
   name = name.trim();
@@ -369,6 +380,13 @@ function addCardType(label, color){
 }
 function removeCardType(id){
   state.cardTypes = state.cardTypes.filter(c => c.id !== id);
+  persist();
+}
+function moveCardType(index, dir){
+  const newIndex = index + dir;
+  if (newIndex < 0 || newIndex >= state.cardTypes.length) return;
+  const arr = state.cardTypes;
+  [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
   persist();
 }
 
@@ -566,8 +584,12 @@ function renderManage(){
     <input type="text" id="newClassInput" placeholder='e.g. "World History (Period 2)"' />
     <button class="primary" id="addClassBtn">Add class</button>
   </div>
-  ${state.classes.map(c => `
+  ${state.classes.map((c, i) => `
     <div class="list-row">
+      <span class="move-btns">
+        <button class="move-btn" data-move-class="${i}" data-dir="-1" ${i===0?"disabled":""}>&#9650;</button>
+        <button class="move-btn" data-move-class="${i}" data-dir="1" ${i===state.classes.length-1?"disabled":""}>&#9660;</button>
+      </span>
       <input type="text" value="${esc(c)}" data-oldname="${esc(c)}" class="renameClassInput" />
       <button class="danger-link" data-remove-class="${esc(c)}">Remove</button>
     </div>`).join("")}
@@ -603,9 +625,13 @@ function renderManage(){
     <select id="newCardColorSelect">${COLOR_CHOICES.map(c=>`<option value="${c}">${c}</option>`).join("")}</select>
     <button class="primary" id="addCardTypeBtn">Add</button>
   </div>
-  ${state.cardTypes.map(c => `
+  ${state.cardTypes.map((c, i) => `
     <div class="list-row">
-      <span><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</span>
+      <span class="move-btns">
+        <button class="move-btn" data-move-card="${i}" data-dir="-1" ${i===0?"disabled":""}>&#9650;</button>
+        <button class="move-btn" data-move-card="${i}" data-dir="1" ${i===state.cardTypes.length-1?"disabled":""}>&#9660;</button>
+      </span>
+      <span style="flex:1;"><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</span>
       <button class="danger-link" data-remove-card="${c.id}">Remove</button>
     </div>`).join("")}
 
@@ -657,6 +683,9 @@ function attachContentHandlers(){
   document.querySelectorAll("[data-remove-class]").forEach(btn => {
     btn.onclick = () => removeClass(btn.dataset.removeClass);
   });
+  document.querySelectorAll("[data-move-class]").forEach(btn => {
+    btn.onclick = () => moveClass(parseInt(btn.dataset.moveClass, 10), parseInt(btn.dataset.dir, 10));
+  });
 
   const addStudentBtn = document.getElementById("addStudentBtn");
   if (addStudentBtn) addStudentBtn.onclick = () => {
@@ -696,6 +725,9 @@ function attachContentHandlers(){
   };
   document.querySelectorAll("[data-remove-card]").forEach(btn => {
     btn.onclick = () => removeCardType(btn.dataset.removeCard);
+  });
+  document.querySelectorAll("[data-move-card]").forEach(btn => {
+    btn.onclick = () => moveCardType(parseInt(btn.dataset.moveCard, 10), parseInt(btn.dataset.dir, 10));
   });
 
   const exportBackupBtn = document.getElementById("exportBackupBtn");
