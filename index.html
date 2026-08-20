@@ -174,11 +174,20 @@ function initMsal(){
     el.textContent = "The Microsoft sign-in library failed to load from the CDN (check your network connection or try a different network), so sign-in is unavailable right now. Everything else still works offline.";
     return;
   }
+  // Normalize to a canonical redirect URI regardless of how the app was launched
+  // (typed URL, bookmark, or PWA home-screen icon can differ by a trailing
+  // "index.html", which otherwise causes an AADSTS50011 mismatch).
+  let redirectPath = window.location.pathname;
+  if (redirectPath.endsWith("index.html")) {
+    redirectPath = redirectPath.slice(0, -"index.html".length);
+  }
+  const REDIRECT_URI = window.location.origin + redirectPath;
+
   msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: CLIENT_ID,
       authority: "https://login.microsoftonline.com/common",
-      redirectUri: window.location.origin + window.location.pathname,
+      redirectUri: REDIRECT_URI,
     },
     cache: { cacheLocation: "localStorage" }
   });
