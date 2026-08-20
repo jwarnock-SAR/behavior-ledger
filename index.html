@@ -381,6 +381,13 @@ function addCardType(label, color){
   state.cardTypes.push({id: uid(), label, color});
   persist();
 }
+function renameCardType(id, newLabel){
+  newLabel = newLabel.trim();
+  const card = state.cardTypes.find(c => c.id === id);
+  if (!card || !newLabel || newLabel === card.label) { render(); return; }
+  card.label = newLabel;
+  persist();
+}
 function removeCardType(id){
   state.cardTypes = state.cardTypes.filter(c => c.id !== id);
   persist();
@@ -634,7 +641,8 @@ function renderManage(){
         <button class="move-btn" data-move-card="${i}" data-dir="-1" ${i===0?"disabled":""}>&#9650;</button>
         <button class="move-btn" data-move-card="${i}" data-dir="1" ${i===state.cardTypes.length-1?"disabled":""}>&#9660;</button>
       </span>
-      <span style="flex:1;"><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</span>
+      <span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>
+      <input type="text" value="${esc(c.label)}" data-oldlabel="${esc(c.id)}" class="renameCardInput" style="flex:1;" />
       <button class="danger-link" data-remove-card="${c.id}">Remove</button>
     </div>`).join("")}
 
@@ -726,6 +734,10 @@ function attachContentHandlers(){
     addCardType(label, color);
     document.getElementById("newCardLabelInput").value = "";
   };
+  document.querySelectorAll(".renameCardInput").forEach(inp => {
+    inp.onblur = () => renameCardType(inp.dataset.oldlabel, inp.value);
+    inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
+  });
   document.querySelectorAll("[data-remove-card]").forEach(btn => {
     btn.onclick = () => removeCardType(btn.dataset.removeCard);
   });
