@@ -174,44 +174,20 @@ function initMsal(){
     el.textContent = "The Microsoft sign-in library failed to load from the CDN (check your network connection or try a different network), so sign-in is unavailable right now. Everything else still works offline.";
     return;
   }
-  // Normalize to a canonical redirect URI regardless of how the app was launched
-  // (typed URL, bookmark, or PWA home-screen icon can differ by a trailing
-  // "index.html", which otherwise causes an AADSTS50011 mismatch).
-  let redirectPath = window.location.pathname;
-  if (redirectPath.endsWith("index.html")) {
-    redirectPath = redirectPath.slice(0, -"index.html".length);
-  }
-  const REDIRECT_URI = window.location.origin + redirectPath;
-
   msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: CLIENT_ID,
       authority: "https://login.microsoftonline.com/common",
-      redirectUri: REDIRECT_URI,
+      redirectUri: window.location.origin + window.location.pathname,
     },
     cache: { cacheLocation: "localStorage" }
   });
-
-  // Using redirect-based sign-in (rather than popups) because popups are
-  // unreliable on mobile browsers (Android/iOS) and can trigger AADSTS900561.
-  msalInstance.handleRedirectPromise().then((response) => {
-    if (response && response.account) {
-      account = response.account;
-    } else {
-      const existing = msalInstance.getAllAccounts();
-      if (existing.length > 0) account = existing[0];
-    }
-    if (account) {
-      updateSyncUI();
-      const pending = localStorage.getItem("bt-pending-action");
-      localStorage.removeItem("bt-pending-action");
-      if (pending === "push") pushToCloud();
-      else pullFromCloud(true);
-    }
-  }).catch((e) => {
-    console.error(e);
-    setSyncStatus("Sign-in failed: " + (e.errorMessage || e.message));
-  });
+  const existing = msalInstance.getAllAccounts();
+  if (existing.length > 0) {
+    account = existing[0];
+    updateSyncUI();
+    pullFromCloud(true);
+  }
 }
 
 async function signIn(){
@@ -222,24 +198,24 @@ async function signIn(){
     return;
   }
   try {
-    await msalInstance.loginRedirect({ scopes: SCOPES });
-    // Page navigates away here; execution resumes via handleRedirectPromise on reload.
+    const res = await msalInstance.loginPopup({ scopes: SCOPES });
+    account = res.account;
+    updateSyncUI();
+    await pullFromCloud(true);
   } catch (e) {
     console.error(e);
     setSyncStatus("Sign-in failed: " + (e.errorMessage || e.message));
   }
 }
 
-async function getToken(pendingAction){
+async function getToken(){
   if (!account) return null;
   try {
     const res = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
     return res.accessToken;
   } catch (e) {
-    // Interactive fallback also uses redirect, for the same mobile-reliability reason.
-    if (pendingAction) localStorage.setItem("bt-pending-action", pendingAction);
-    await msalInstance.acquireTokenRedirect({ scopes: SCOPES });
-    return null; // page is navigating away; nothing after this will run
+    const res = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+    return res.accessToken;
   }
 }
 
@@ -247,8 +223,7 @@ async function pullFromCloud(silent){
   if (!account) return;
   setSyncStatus("Syncing…");
   try {
-    const token = await getToken("pull");
-    if (!token) return; // redirecting for interactive sign-in; will resume after reload
+    const token = await getToken();
     const res = await fetch(GRAPH_FILE_URL, { headers: { Authorization: "Bearer " + token }});
     if (res.status === 404) {
       setSyncStatus("Signed in — no cloud file yet, will create on first save");
@@ -275,8 +250,7 @@ async function pullFromCloud(silent){
 async function pushToCloud(){
   if (!account) { saveLocal(); return; }
   try {
-    const token = await getToken("push");
-    if (!token) return; // redirecting for interactive sign-in; will resume after reload
+    const token = await getToken();
     const body = JSON.stringify({classes:state.classes, roster:state.roster, cardTypes:state.cardTypes, entries:state.entries});
     const res = await fetch(GRAPH_FILE_URL, {
       method: "PUT",
@@ -353,6 +327,14 @@ function removeStudent(id){
   state.roster[state.activeClass] = (state.roster[state.activeClass]||[]).filter(s => s.id !== id);
   persist();
 }
+function renameStudent(id, newName){
+  newName = newName.trim();
+  if (!newName) { render(); return; }
+  const list = state.roster[state.activeClass] || [];
+  const student = list.find(s => s.id === id);
+  if (student) student.name = newName;
+  persist();
+}
 function clearStudentEntries(studentId, studentName){
   const ok = confirm(`Clear all logged cards for ${studentName} in ${state.activeClass}? This cannot be undone.`);
   if (!ok) return;
@@ -405,13 +387,6 @@ function addCardType(label, color){
   label = label.trim();
   if (!label) return;
   state.cardTypes.push({id: uid(), label, color});
-  persist();
-}
-function renameCardType(id, newLabel){
-  newLabel = newLabel.trim();
-  const card = state.cardTypes.find(c => c.id === id);
-  if (!card || !newLabel || newLabel === card.label) { render(); return; }
-  card.label = newLabel;
   persist();
 }
 function removeCardType(id){
@@ -551,6 +526,13 @@ function render(){
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+function countFor(studentId, cardTypeId){
+  let n = 0;
+  for (const e of state.entries) {
+    if (e.classId === state.activeClass && e.studentId === studentId && e.cardTypeId === cardTypeId) n++;
+  }
+  return n;
+}
 function renderLog(){
   const students = state.roster[state.activeClass] || [];
   if (students.length === 0) return `<p class="empty">No students in ${esc(state.activeClass)} yet. Add your roster in the Manage tab.</p>`;
@@ -558,7 +540,7 @@ function renderLog(){
     <div class="card">
       <div class="student-name">${esc(s.name)}</div>
       <div class="chip-row">
-        ${state.cardTypes.map(c => `<button class="chip" style="background:${COLOR_HEX[c.color]||"#334155"}" data-student="${s.id}" data-card="${c.id}" title="${esc(c.label)}">${esc(c.label)}</button>`).join("")}
+        ${state.cardTypes.map(c => `<button class="chip" style="background:${COLOR_HEX[c.color]||"#334155"}" data-student="${s.id}" data-card="${c.id}" title="${esc(c.label)}">${esc(c.label)} (${countFor(s.id, c.id)})</button>`).join("")}
       </div>
     </div>`).join("");
   if (state.entries.length > 0) html += `<button class="danger-link" id="undoBtn" style="margin-top:6px;">Undo last entry</button>`;
@@ -647,7 +629,7 @@ function renderManage(){
   ` : ""}
   <div style="margin-top:10px;">
     ${students.map(s => `<div class="list-row">
-      <span>${esc(s.name)}</span>
+      <input type="text" value="${esc(s.name)}" data-student-id="${s.id}" class="renameStudentInput" style="flex:1;" />
       <span style="display:flex;gap:10px;">
         <button class="danger-link" style="color:#b45309;" data-clear-student="${s.id}" data-student-name="${esc(s.name)}">Clear cards</button>
         <button class="danger-link" data-remove-student="${s.id}">Remove</button>
@@ -667,8 +649,7 @@ function renderManage(){
         <button class="move-btn" data-move-card="${i}" data-dir="-1" ${i===0?"disabled":""}>&#9650;</button>
         <button class="move-btn" data-move-card="${i}" data-dir="1" ${i===state.cardTypes.length-1?"disabled":""}>&#9660;</button>
       </span>
-      <span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>
-      <input type="text" value="${esc(c.label)}" data-oldlabel="${esc(c.id)}" class="renameCardInput" style="flex:1;" />
+      <span style="flex:1;"><span class="swatch" style="background:${COLOR_HEX[c.color]}"></span>${esc(c.label)}</span>
       <button class="danger-link" data-remove-card="${c.id}">Remove</button>
     </div>`).join("")}
 
@@ -738,6 +719,10 @@ function attachContentHandlers(){
   document.querySelectorAll("[data-clear-student]").forEach(btn => {
     btn.onclick = () => clearStudentEntries(btn.dataset.clearStudent, btn.dataset.studentName);
   });
+  document.querySelectorAll(".renameStudentInput").forEach(inp => {
+    inp.onblur = () => renameStudent(inp.dataset.studentId, inp.value);
+    inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
+  });
 
   const toggleBulkBtn = document.getElementById("toggleBulkBtn");
   if (toggleBulkBtn) toggleBulkBtn.onclick = () => { state.bulkOpen = !state.bulkOpen; render(); };
@@ -760,10 +745,6 @@ function attachContentHandlers(){
     addCardType(label, color);
     document.getElementById("newCardLabelInput").value = "";
   };
-  document.querySelectorAll(".renameCardInput").forEach(inp => {
-    inp.onblur = () => renameCardType(inp.dataset.oldlabel, inp.value);
-    inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
-  });
   document.querySelectorAll("[data-remove-card]").forEach(btn => {
     btn.onclick = () => removeCardType(btn.dataset.removeCard);
   });
