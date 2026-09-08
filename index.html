@@ -178,7 +178,7 @@ function initMsal(){
     auth: {
       clientId: CLIENT_ID,
       authority: "https://login.microsoftonline.com/common",
-      redirectUri: window.location.origin + window.location.pathname,
+      redirectUri: window.location.origin + window.location.pathname.replace(/index\.html$/, ""),
     },
     cache: { cacheLocation: "localStorage" }
   });

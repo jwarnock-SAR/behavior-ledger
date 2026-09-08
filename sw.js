@@ -1,6 +1,6 @@
 // Bump this version string every time you update index.html and re-upload,
 // so devices pick up the new version instead of an old cached copy.
-const CACHE_NAME = "behavior-ledger-v7";
+const CACHE_NAME = "behavior-ledger-v8";
 
 const SHELL_FILES = [
   "./index.html",

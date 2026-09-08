@@ -175,7 +175,7 @@ function initMsal(){
     auth: {
       clientId: CLIENT_ID,
       authority: "https://login.microsoftonline.com/common",
-      redirectUri: window.location.origin + window.location.pathname,
+      redirectUri: window.location.origin + window.location.pathname.replace(/index\.html$/, ""),
     },
     cache: { cacheLocation: "localStorage" }
   });
@@ -322,6 +322,14 @@ function addStudent(name){
 }
 function removeStudent(id){
   state.roster[state.activeClass] = (state.roster[state.activeClass]||[]).filter(s => s.id !== id);
+  persist();
+}
+function renameStudent(id, newName){
+  newName = newName.trim();
+  if (!newName) { render(); return; }
+  const list = state.roster[state.activeClass] || [];
+  const student = list.find(s => s.id === id);
+  if (student) student.name = newName;
   persist();
 }
 function clearStudentEntries(studentId, studentName){
@@ -515,6 +523,13 @@ function render(){
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+function countFor(studentId, cardTypeId){
+  let n = 0;
+  for (const e of state.entries) {
+    if (e.classId === state.activeClass && e.studentId === studentId && e.cardTypeId === cardTypeId) n++;
+  }
+  return n;
+}
 function renderLog(){
   const students = state.roster[state.activeClass] || [];
   if (students.length === 0) return `<p class="empty">No students in ${esc(state.activeClass)} yet. Add your roster in the Manage tab.</p>`;
@@ -522,7 +537,7 @@ function renderLog(){
     <div class="card">
       <div class="student-name">${esc(s.name)}</div>
       <div class="chip-row">
-        ${state.cardTypes.map(c => `<button class="chip" style="background:${COLOR_HEX[c.color]||"#334155"}" data-student="${s.id}" data-card="${c.id}" title="${esc(c.label)}">${esc(c.label)}</button>`).join("")}
+        ${state.cardTypes.map(c => `<button class="chip" style="background:${COLOR_HEX[c.color]||"#334155"}" data-student="${s.id}" data-card="${c.id}" title="${esc(c.label)}">${esc(c.label)} (${countFor(s.id, c.id)})</button>`).join("")}
       </div>
     </div>`).join("");
   if (state.entries.length > 0) html += `<button class="danger-link" id="undoBtn" style="margin-top:6px;">Undo last entry</button>`;
@@ -611,7 +626,7 @@ function renderManage(){
   ` : ""}
   <div style="margin-top:10px;">
     ${students.map(s => `<div class="list-row">
-      <span>${esc(s.name)}</span>
+      <input type="text" value="${esc(s.name)}" data-student-id="${s.id}" class="renameStudentInput" style="flex:1;" />
       <span style="display:flex;gap:10px;">
         <button class="danger-link" style="color:#b45309;" data-clear-student="${s.id}" data-student-name="${esc(s.name)}">Clear cards</button>
         <button class="danger-link" data-remove-student="${s.id}">Remove</button>
@@ -700,6 +715,10 @@ function attachContentHandlers(){
   });
   document.querySelectorAll("[data-clear-student]").forEach(btn => {
     btn.onclick = () => clearStudentEntries(btn.dataset.clearStudent, btn.dataset.studentName);
+  });
+  document.querySelectorAll(".renameStudentInput").forEach(inp => {
+    inp.onblur = () => renameStudent(inp.dataset.studentId, inp.value);
+    inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
   });
 
   const toggleBulkBtn = document.getElementById("toggleBulkBtn");

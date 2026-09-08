@@ -2,7 +2,7 @@
   "name": "Behavior Ledger",
   "short_name": "Ledger",
   "description": "Classroom behavior card tracker with OneDrive sync",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
