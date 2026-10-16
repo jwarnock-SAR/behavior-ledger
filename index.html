@@ -335,6 +335,23 @@ function renameStudent(id, newName){
   if (student) student.name = newName;
   persist();
 }
+function moveStudentToClass(studentId, targetClass){
+  if (!targetClass || targetClass === state.activeClass) return;
+  const sourceClass = state.activeClass;
+  const list = state.roster[sourceClass] || [];
+  const student = list.find(s => s.id === studentId);
+  if (!student) return;
+  const ok = confirm(`Move ${student.name} from ${sourceClass} to ${targetClass}? Their logged card history will move with them.`);
+  if (!ok) { render(); return; }
+  state.roster[sourceClass] = list.filter(s => s.id !== studentId);
+  if (!state.roster[targetClass]) state.roster[targetClass] = [];
+  state.roster[targetClass].push(student);
+  state.entries.forEach(e => {
+    if (e.classId === sourceClass && e.studentId === studentId) e.classId = targetClass;
+  });
+  persist();
+  setSyncStatus(`Moved ${student.name} to ${targetClass}`);
+}
 function clearStudentEntries(studentId, studentName){
   const ok = confirm(`Clear all logged cards for ${studentName} in ${state.activeClass}? This cannot be undone.`);
   if (!ok) return;
@@ -628,9 +645,13 @@ function renderManage(){
     <p style="font-size:12px;color:var(--muted);">Duplicate names already in this class's roster are skipped.</p>
   ` : ""}
   <div style="margin-top:10px;">
-    ${students.map(s => `<div class="list-row">
-      <input type="text" value="${esc(s.name)}" data-student-id="${s.id}" class="renameStudentInput" style="flex:1;" />
-      <span style="display:flex;gap:10px;">
+    ${students.map(s => `<div class="list-row" style="flex-wrap:wrap;">
+      <input type="text" value="${esc(s.name)}" data-student-id="${s.id}" class="renameStudentInput" style="flex:1;min-width:100px;" />
+      <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        ${state.classes.length > 1 ? `<select class="moveStudentSelect" data-student-id="${s.id}" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid #cbd5e1;">
+          <option value="">Move to...</option>
+          ${state.classes.filter(c => c !== state.activeClass).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}
+        </select>` : ""}
         <button class="danger-link" style="color:#b45309;" data-clear-student="${s.id}" data-student-name="${esc(s.name)}">Clear cards</button>
         <button class="danger-link" data-remove-student="${s.id}">Remove</button>
       </span>
@@ -722,6 +743,9 @@ function attachContentHandlers(){
   document.querySelectorAll(".renameStudentInput").forEach(inp => {
     inp.onblur = () => renameStudent(inp.dataset.studentId, inp.value);
     inp.onkeydown = (e) => { if (e.key === "Enter") inp.blur(); };
+  });
+  document.querySelectorAll(".moveStudentSelect").forEach(sel => {
+    sel.onchange = () => moveStudentToClass(sel.dataset.studentId, sel.value);
   });
 
   const toggleBulkBtn = document.getElementById("toggleBulkBtn");
