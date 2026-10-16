@@ -335,6 +335,20 @@ function renameStudent(id, newName){
   if (student) student.name = newName;
   persist();
 }
+function moveStudent(index, dir){
+  const list = state.roster[state.activeClass] || [];
+  const newIndex = index + dir;
+  if (newIndex < 0 || newIndex >= list.length) return;
+  [list[index], list[newIndex]] = [list[newIndex], list[index]];
+  persist();
+}
+function sortStudentsByLastName(){
+  const list = state.roster[state.activeClass] || [];
+  const lastKey = n => { const parts = n.trim().split(/\s+/); return (parts[parts.length-1] + " " + parts[0]).toLowerCase(); };
+  list.sort((a, b) => lastKey(a.name).localeCompare(lastKey(b.name)));
+  persist();
+  setSyncStatus("Roster sorted A\u2013Z by last name");
+}
 function moveStudentToClass(studentId, targetClass){
   if (!targetClass || targetClass === state.activeClass) return;
   const sourceClass = state.activeClass;
@@ -638,6 +652,7 @@ function renderManage(){
   <div class="row" style="align-items:center;">
     <button class="ghost" id="toggleBulkBtn">${state.bulkOpen ? "Hide bulk import" : "Bulk import roster"}</button>
     <label class="file-label">Upload CSV / TXT<input type="file" id="fileUploadInput" accept=".csv,.txt" /></label>
+    <button class="ghost" id="sortStudentsBtn">Sort A&ndash;Z by last name</button>
   </div>
   ${state.bulkOpen ? `
     <textarea id="bulkTextarea" rows="5" style="width:100%;" placeholder="Paste names, one per line"></textarea>
@@ -645,7 +660,11 @@ function renderManage(){
     <p style="font-size:12px;color:var(--muted);">Duplicate names already in this class's roster are skipped.</p>
   ` : ""}
   <div style="margin-top:10px;">
-    ${students.map(s => `<div class="list-row" style="flex-wrap:wrap;">
+    ${students.map((s, i) => `<div class="list-row" style="flex-wrap:wrap;">
+      <span class="move-btns">
+        <button class="move-btn" data-move-student="${i}" data-dir="-1" ${i===0?"disabled":""}>&#9650;</button>
+        <button class="move-btn" data-move-student="${i}" data-dir="1" ${i===students.length-1?"disabled":""}>&#9660;</button>
+      </span>
       <input type="text" value="${esc(s.name)}" data-student-id="${s.id}" class="renameStudentInput" style="flex:1;min-width:100px;" />
       <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         ${state.classes.length > 1 ? `<select class="moveStudentSelect" data-student-id="${s.id}" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid #cbd5e1;">
@@ -747,6 +766,11 @@ function attachContentHandlers(){
   document.querySelectorAll(".moveStudentSelect").forEach(sel => {
     sel.onchange = () => moveStudentToClass(sel.dataset.studentId, sel.value);
   });
+  document.querySelectorAll("[data-move-student]").forEach(btn => {
+    btn.onclick = () => moveStudent(parseInt(btn.dataset.moveStudent, 10), parseInt(btn.dataset.dir, 10));
+  });
+  const sortStudentsBtn = document.getElementById("sortStudentsBtn");
+  if (sortStudentsBtn) sortStudentsBtn.onclick = sortStudentsByLastName;
 
   const toggleBulkBtn = document.getElementById("toggleBulkBtn");
   if (toggleBulkBtn) toggleBulkBtn.onclick = () => { state.bulkOpen = !state.bulkOpen; render(); };
