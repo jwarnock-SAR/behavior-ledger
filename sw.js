@@ -1,12 +1,12 @@
 // Bump this version string every time you update index.html and re-upload,
 // so devices pick up the new version instead of an old cached copy.
-const CACHE_NAME = "behavior-ledger-v10";
+const CACHE_NAME = "behavior-ledger-v11";
 
 const SHELL_FILES = [
   "./index.html",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icon-192.png",
+  "./icon-512.png",
   "./msal-browser.min.js",
 ];
 
